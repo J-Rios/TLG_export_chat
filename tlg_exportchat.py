@@ -12,7 +12,7 @@ Creation date:
 Last modified date:
     04/02/2018
 Version:
-    1.0.0
+    1.0.1
 '''
 
 ####################################################################################################
@@ -162,15 +162,15 @@ def file_write_history(chat_name, messages):
 			for msg in messages:
 				sent_moment = "{} - {}".format(msg['sent_date'], msg['sent_time'])
 				msg_text = msg['text']
-				if msg_text == "None":
+				if (msg_text is None) or (msg_text is ""):
 					msg_text = "[Image/Audio/Video/File/...]"
 				if msg['reply_to']:
 					msg_to_Write = "\n[MSG ID - {}]\n{}\n{}:\n[In reply to {}] - {}\n\n" \
 						.format(msg['id'], sent_moment, msg['sender_user'], msg['reply_to'], \
-						msg['text'])
+						msg_text)
 				else:
 					msg_to_Write = "\n[MSG ID - {}]\n{}\n{}:\n{}\n\n" \
-						.format(msg['id'], sent_moment, msg['sender_user'],	msg['text'])
+						.format(msg['id'], sent_moment, msg['sender_user'],	msg_text)
 				# Write the actual message to the file
 				f.write(msg_to_Write)
 	# Catch and handle errors
