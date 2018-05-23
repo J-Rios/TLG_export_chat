@@ -10,9 +10,9 @@ Author:
 Creation date:
     04/02/2018
 Last modified date:
-    04/02/2018
+    24/05/2018
 Version:
-    1.0.1
+    1.1.0
 '''
 
 ####################################################################################################
@@ -36,7 +36,7 @@ import json
 API_ID   = NNNNNN
 API_HASH = 'ffffffffffffffffffffffffffffffff'
 PHONE_NUM    = '+NNNNNNNNNNN'
-LOGIN_CODE = "NNNNN"
+
 
 # Chat to inspect
 CHAT_LINK  = "https://t.me/GroupName"
@@ -44,6 +44,35 @@ CHAT_LINK  = "https://t.me/GroupName"
 ####################################################################################################
 
 ### Telegram basic functions ###
+
+# Connect and Log-in/Sign-in to telegram API
+def tlg_connect(api_id, api_hash, phone_number):
+	'''Connect and Log-in/Sign-in to Telegram API. Request Sign-in code for first execution'''
+	print()
+	client = TelegramClient("Session", api_id, api_hash)
+	if not client.connect():
+		print('Could not connect to Telegram servers.')
+		return None
+	else:
+		if not client.is_user_authorized():
+			print('Session file not found. This is the first run, sending code request...')
+			client.sign_in(phone_number)
+			self_user = None
+			while self_user is None:
+				code = input('Enter the code you just received: ')
+				try:
+					self_user = client.sign_in(code=code)
+				except SessionPasswordNeededError:
+					pw = getpass('Two step verification is enabled. Please enter your password: ')
+					self_user = client.sign_in(password=pw)
+					if self_user is None:
+						print('Error: Can\'t sign in to Telegram.\n')
+						return None
+			print('Sign in to Telegram success.\n')
+		else:
+			print('Log in to Telegram success.\n')
+	return client
+
 
 # Get basic info from a chat
 def tlg_get_basic_info(client, chat):
@@ -56,7 +85,7 @@ def tlg_get_basic_info(client, chat):
 	num_members = client(GetParticipantsRequest(channel=chat_entity, \
 		filter=ChannelParticipantsSearch(''), offset=num_members_offset, limit=0, hash=0)).count
 	# Get messages data from the chat and extract the usefull data related to chat
-	msgs = client.get_message_history(chat_entity, limit=1)
+	msgs = client.get_messages(chat_entity, limit=1)
 	basic_info = OrderedDict \
 		([ \
 			("id", msgs.data[0].to.id), \
@@ -119,8 +148,8 @@ def tlg_get_all_messages(client, chat):
 	# Get the corresponding chat entity
 	chat_entity = client.get_entity(chat)
 	# Get and save all messages data in a single list
-	num_msg = client.get_message_history(chat_entity, limit=1).total
-	msgs = client.get_message_history(chat_entity, limit=num_msg)
+	num_msg = client.get_messages(chat_entity, limit=1).total
+	msgs = client.get_messages(chat_entity, limit=num_msg)
 	# Build our messages data structures and add them to the list
 	for msg in reversed(msgs.data):
 		msg_sender = msg.sender.first_name
@@ -149,6 +178,10 @@ def file_write_history(chat_name, messages):
 	# Lets try to do it
 	file_name = "./output/{}.txt".format(chat_name)
 	try:
+		# Create the directories of the file path if them does not exists
+		directory = path.dirname(file_name)
+		if not path.exists(directory):
+			makedirs(directory)
 		# Open the file to write (Overwrite if exists)
 		with open(file_name, 'w', encoding="utf-8") as f:
 			# Get export date from last messages of the chat
@@ -188,25 +221,27 @@ def file_write_history(chat_name, messages):
 def main():
 	'''Main Function'''
 	# Create the client and connect
-	client = TelegramClient("Session", API_ID, API_HASH)
-	client.connect()
-
-	# Check and login the client if needed
-	if not client.is_user_authorized():
-		client.sign_in(PHONE_NUM, LOGIN_CODE)
-	else:
+	client = tlg_connect(API_ID, API_HASH, PHONE_NUM)
+	if client is not None:
     	# Get chat basic info to determine chat name
 		chat_info = tlg_get_basic_info(client, CHAT_LINK)
+		chat_name = "unknown"
 		if chat_info["username"]:
 			chat_name = chat_info["username"]
 		else:
 			chat_name = chat_info["title"]
+
+		print('The duration of the export process goes from minutes to hours depending on the ' \
+			  'number of messages that the chat has.')
+		print('Exporting messages, please wait...')
 
 		# Get all messages data from the chat
 		messages = tlg_get_all_messages(client, CHAT_LINK)
 
 		# Write to the file all the messages history
 		file_write_history(chat_name, messages)
+
+		print("\nChat succesfully exported in output directory\n")
 		
 
 ####################################################################################################
