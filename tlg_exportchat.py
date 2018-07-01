@@ -3,30 +3,28 @@
 Script:
     tlg_exportchat.py
 Description:
-    Python script that use the Telegram Client API to get all chat messages and export them to a \
+    Python script that use the Telegram Client API to get all chat messages and export them to a 
 	file.
 Author:
     Jose Rios Rubio
 Creation date:
     04/02/2018
 Last modified date:
-    24/05/2018
+    01/07/2018
 Version:
-    1.1.0
+    1.2.0
 '''
 
 ####################################################################################################
 
 ### Libraries/Modules ###
 
+import json
 from telethon import TelegramClient
 from telethon.tl.functions.channels import GetParticipantsRequest
 from telethon.tl.types import ChannelParticipantsSearch
-
 from collections import OrderedDict
 from os import path, stat, remove, makedirs
-
-import json
 
 ####################################################################################################
 
@@ -35,11 +33,7 @@ import json
 # Client parameters
 API_ID   = NNNNNN
 API_HASH = 'ffffffffffffffffffffffffffffffff'
-PHONE_NUM    = '+NNNNNNNNNNN'
-
-
-# Chat to inspect
-CHAT_LINK  = "https://t.me/GroupName"
+PHONE_NUM = '+NNNNNNNNNNN'
 
 ####################################################################################################
 
@@ -141,12 +135,12 @@ def tlg_get_all_members(client, chat):
 
 
 # Get all messages data from a chat
-def tlg_get_all_messages(client, chat):
-	'''Get all members information from a group/channel/chat'''
+def tlg_get_all_messages(client, chat_id):
+	'''Get all messages information from a group/channel/chat'''
 	# Set the result list
 	messages = []
 	# Get the corresponding chat entity
-	chat_entity = client.get_entity(chat)
+	chat_entity = client.get_entity(chat_id)
 	# Get and save all messages data in a single list
 	num_msg = client.get_messages(chat_entity, limit=1).total
 	msgs = client.get_messages(chat_entity, limit=num_msg)
@@ -168,6 +162,37 @@ def tlg_get_all_messages(client, chat):
 		messages.append(msg_data)
 	# Return the messages data list
 	return messages
+
+
+def tlg_get_all_messages_from_user(client, user_id, chat_link):
+	''' Get all the messages from an specified user of a group/channel/chat'''
+	# Set the result list
+	messages = []
+	# Get the corresponding chat and user entities
+	chat_entity = client.get_entity(chat_link)
+	user_entity = client.get_entity(int(user_id))
+	# Get and save all messages data in a single list
+	num_msg = client.get_messages(chat_entity, from_user=user_entity, limit=1).total
+	msgs = client.get_messages(chat_entity, from_user=user_entity, limit=num_msg)
+	# Build our messages data structures and add them to the list
+	for msg in reversed(msgs.data):
+		msg_sender = msg.sender.first_name
+		if msg.sender.last_name:
+			msg_sender = "{} {}".format(msg_sender, msg.sender.last_name)
+		if msg.sender.username:
+			msg_sender = "{} (@{})".format(msg_sender, msg.sender.username)
+		msg_sent_date = "{}/{}/{}".format(msg.date.day, msg.date.month, msg.date.year)
+		msg_sent_time = "{}:{}:{}".format(msg.date.hour, msg.date.minute, msg.date.second)
+		msg_data = OrderedDict \
+			([ \
+				("id", msg.id), ("text", msg.message), ("sent_time", msg_sent_time), \
+				("sent_date", msg_sent_date), ("sender_user", msg_sender), \
+				("sender_user_id", msg.sender.id), ("reply_to", msg.reply_to_msg_id) \
+			])
+		messages.append(msg_data)
+	# Return the messages data list
+	return messages
+
 
 ####################################################################################################
 
@@ -214,39 +239,72 @@ def file_write_history(chat_name, messages):
 	except MemoryError:
 		print("    Error: You are trying to write too much data")
 
-
 ####################################################################################################
 
 ### Main function ###
 def main():
 	'''Main Function'''
 	# Create the client and connect
+	error = False
 	client = tlg_connect(API_ID, API_HASH, PHONE_NUM)
 	if client is not None:
-    	# Get chat basic info to determine chat name
-		chat_info = tlg_get_basic_info(client, CHAT_LINK)
+    	# Get chat link to export
+		chat_link = input('\nLink of the Chat that you want to export: ')
+		# Get chat basic info to determine chat name
+		chat_info = tlg_get_basic_info(client, chat_link)
 		chat_name = "unknown"
 		if chat_info["username"]:
 			chat_name = chat_info["username"]
 		else:
 			chat_name = chat_info["title"]
-
-		print('The duration of the export process goes from minutes to hours depending on the ' \
-			  'number of messages that the chat has.')
-		print('Exporting messages, please wait...')
-
-		# Get all messages data from the chat
-		messages = tlg_get_all_messages(client, CHAT_LINK)
-
-		# Write to the file all the messages history
-		file_write_history(chat_name, messages)
-
-		print("\nChat succesfully exported in output directory\n")
+		# Show and wait for user export option selection
+		print('\nExport options for {}:\n--------------------------------------------\n' \
+			'  1. Export all\n' \
+			'  2. Export from user\n\n'.format(chat_link))
+		export_option = input('Option [1 or 2]: ')
+		if export_option == '1':
+			# Get all messages data from the chat
+			print('The duration of the export process goes from minutes to hours ' \
+				'depending on the number of messages that the chat has.')
+			print('Exporting messages, please wait...')
+			messages = tlg_get_all_messages(client, chat_link)
+			# Write to the file all the messages history
+			if messages:
+				file_write_history(chat_name, messages)
+			else:
+				print('\n  Error - Can\'t access to chat messages information')
+				error = True
+		else:
+			# Get all messages data from user
+			print('Getting chat members (users) info...')
+			members = tlg_get_all_members(client, chat_link)
+			if members:
+				print('\nList of users:')
+				print('---------------')
+				for usr in members:
+					if usr['username']:
+						print('- {} [{}]'.format(usr['username'], usr['id']))
+					else:
+						print('- {} {} [{}]'.format(usr['first_name'], usr['last_name'], usr['id']))
+				user_id = input('\nUser to export (ID): ')
+				print('\nThe duration of the export process goes from minutes to hours ' \
+					'depending on the number of messages that the chat has.')
+				print('Exporting messages, please wait...')
+				messages = tlg_get_all_messages_from_user(client, user_id, chat_link)
+				# Write to the file all the messages history
+				if messages:
+					file_write_history(chat_name, messages)
+				else:
+					print('\n  Error - That user has never speak in this chat.')
+					error = True
+			else:
+				print('\n  Error - Can\'t access to chat members information')
+				error = True
+		if not error:
+			print("\nChat succesfully exported in output directory\n")
 		
-
 ####################################################################################################
 
 ### Execute the main function if the file is not an imported module ###
 if __name__ == "__main__":
 	main()
-

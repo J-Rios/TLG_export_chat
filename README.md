@@ -2,7 +2,7 @@
 
 ## Description:
 
-Python script that use the Telegram Client API to get all chat messages and export them to a file.
+Python script that use the Telegram Client API to get all chat messages (or all messages of a specific user) and export them to a file.
 
 -------------------------------------------------------------------------------------------------------------------------
 
@@ -11,9 +11,9 @@ Python script that use the Telegram Client API to get all chat messages and expo
 1 - First, you need a Telegram Client-API ID and Application Hash. You can get them by login and creating a new "App" in:
 https://my.telegram.org
 
-2 - Next, you have to set "API_ID", "API_HASH", "PHONE_NUM" and "CHAT_LINK" (chat that you want to export the data) in "tlg_exportchat.py" file.
+2 - Next, you have to set "API_ID", "API_HASH" and "PHONE_NUM" in "tlg_exportchat.py" file.
 
-3 - Then, you are free to execute "tlg_exportchat.py" file to export the chat data from the "CHAT_LINK" provided:
+3 - Then, you are free to execute "tlg_exportchat.py" file to start the export script:
 python3 tlg_exportchat.py
 
 -------------------------------------------------------------------------------------------------------------------------
@@ -26,7 +26,7 @@ python3 tlg_exportchat.py
 
 - Once you insert the "Sign-in Code" and the connection is successfully established, the sign-in validation is stored in a file named "Session.session".
 
-- The "Session.session" file is used in next scripts runs (logins attempts), so it wont request a Sign-in Code again.
+- The "Session.session" file is used in next script runs (logins attempts), so it wont request a Sign-in Code again.
 
 - If you still have problems for sign in when using the correct received code, delete the "Session.session" file and try again.
 
