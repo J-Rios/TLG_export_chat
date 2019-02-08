@@ -25,6 +25,7 @@ from telethon.tl.functions.channels import GetParticipantsRequest
 from telethon.tl.types import ChannelParticipantsSearch
 from collections import OrderedDict
 from os import path, stat, remove, makedirs
+from sys import exit
 
 ####################################################################################################
 
@@ -71,12 +72,17 @@ def tlg_connect(api_id, api_hash, phone_number):
 def tlg_get_basic_info(client, chat):
 	'''Get basic information (id, title, name, num_users, num_messages) from a group/channel/chat'''
 	# Get the corresponding chat entity
-	chat_entity = client.get_entity(chat)
+	try:
+		chat_entity = client.get_entity(chat)
+	except ValueError:
+		print("Can't find the provided chat.")
+		exit(1)
 	# Get the number of users in the chat
-	num_members_offset = client(GetParticipantsRequest(channel=chat_entity, \
-		filter=ChannelParticipantsSearch(''), offset=0, limit=0, hash=0)).count
-	num_members = client(GetParticipantsRequest(channel=chat_entity, \
-		filter=ChannelParticipantsSearch(''), offset=num_members_offset, limit=0, hash=0)).count
+	try:
+		num_members = client.get_participants(chat_entity)
+	except Exception:
+		print("Can't get number of members in the chat (Chat Admin privileges required).")
+		num_members = "Chat Admin privileges required"
 	# Get messages data from the chat and extract the usefull data related to chat
 	msgs = client.get_messages(chat_entity, limit=1)
 	basic_info = OrderedDict \
@@ -101,8 +107,11 @@ def tlg_get_all_members(client, chat):
 	i = 0
 	members = []
 	users = []
-	num_members = client(GetParticipantsRequest(channel=chat_entity, \
-		filter=ChannelParticipantsSearch(''), offset=0, limit=0, hash=0)).count
+	try:
+		num_members = client.get_participants(chat_entity)
+	except Exception:
+		print("Can't get number of members in the chat (Chat Admin privileges required).")
+		exit(1)
 	while True:
 		participants_i = client(GetParticipantsRequest(channel=chat_entity, \
 			filter=ChannelParticipantsSearch(''), offset=i, limit=num_members, hash=0))
@@ -145,11 +154,18 @@ def tlg_get_all_messages(client, chat_id):
 	msgs = client.get_messages(chat_entity, limit=num_msg)
 	# Build our messages data structures and add them to the list
 	for msg in reversed(msgs):
-		msg_sender = msg.sender.first_name
-		if msg.sender.last_name:
-			msg_sender = "{} {}".format(msg_sender, msg.sender.last_name)
-		if msg.sender.username:
-			msg_sender = "{} (@{})".format(msg_sender, msg.sender.username)
+		msg_sender = ""
+		if hasattr(msg.sender, "first_name"):
+			msg_sender = msg.sender.first_name
+			if hasattr(msg.sender, "last_name"):
+				if msg.sender.last_name:
+					msg_sender = "{} {}".format(msg_sender, msg.sender.last_name)
+		if hasattr(msg.sender, "username"):
+			if msg.sender.username:
+				if msg_sender != "":
+					msg_sender = "{} (@{})".format(msg_sender, msg.sender.username)
+				else:
+					msg_sender = "@{}".format(msg.sender.username)
 		msg_sent_date = "{}/{}/{}".format(msg.date.day, msg.date.month, msg.date.year)
 		msg_sent_time = "{}:{}:{}".format(msg.date.hour, msg.date.minute, msg.date.second)
 		msg_data = OrderedDict \
@@ -262,6 +278,9 @@ def main():
 			'  1. Export all\n' \
 			'  2. Export from user\n\n'.format(chat_link))
 		export_option = input('Option [1 or 2]: ')
+		while (export_option != '1') and (export_option != '2'):
+			print("Invalid option.\n")
+			export_option = input('Option [1 or 2]: ')
 		if export_option == '1':
 			# Get all messages data from the chat
 			print('The duration of the export process goes from minutes to hours ' \
@@ -274,7 +293,7 @@ def main():
 			else:
 				print('\n  Error - Can\'t access to chat messages information')
 				error = True
-		else:
+		elif export_option == '2':
 			# Get all messages data from user
 			print('Getting chat members (users) info...')
 			members = tlg_get_all_members(client, chat_link)
